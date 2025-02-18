@@ -2,7 +2,6 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Footer from "./component/Footer";
 import Home from "./pages/Home"
-import AddReview from './pages/Addreview'
 import Viewbook from "./pages/Viewbook";
 import Addbook from "./pages/Addbook";
 import Onebook from "./pages/Onebook";
@@ -18,7 +17,6 @@ const App = () => {
         <Routes>
         <Route path='/login' element={<Login/>}/> 
         <Route path='/' element={<Home/>}/>
-        <Route path='/add-review/:id' element={<AddReview/>}/>
         <Route path='/view-book' element={<Viewbook/>}/>
         <Route path='/add-book' element={<Addbook/>}/>
         <Route path='/update-book/:id' element={<Updatebook/>}/>
