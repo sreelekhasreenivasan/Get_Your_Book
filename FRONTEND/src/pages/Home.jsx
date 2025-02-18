@@ -24,7 +24,7 @@ const Home = () => {
  useEffect(() => {
     const fetchBooks = async () => {
       try {
-        const response = await fetch("http://127.0.0.1:3000/viewbooks"); // Replace with your API endpoint
+        const response = await fetch("http://127.0.0.1:3000/viewbooks"); 
         if (!response.ok) {
           throw new Error("Failed to fetch books");
         }
