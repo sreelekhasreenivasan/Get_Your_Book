@@ -14,7 +14,6 @@ const AddBook = () => {
   const submitForm = async (e) => {
     e.preventDefault();
 
-    // Create a new FormData object to handle the file and text data
     const formData = new FormData();
     formData.append('title', title);
     formData.append('author', author);
@@ -26,7 +25,7 @@ const AddBook = () => {
     try {
       const res = await fetch('http://127.0.0.1:3000/addbook', {
         method: 'POST',
-        body: formData, // Send form data with file
+        body: formData, 
       });
 
       if (res.status === 201) {

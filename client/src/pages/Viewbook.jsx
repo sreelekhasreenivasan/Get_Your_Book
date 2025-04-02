@@ -89,7 +89,6 @@ const Viewbook = () => {
         </div>
       </section>
 
-      {/* Display Error Message */}
       {error && (
         <div className="bg-red-100 text-red-800 border border-red-200 p-4 rounded-md max-w-2xl mx-auto mt-4">
           <p>Error: {error}</p>
@@ -110,7 +109,6 @@ const Viewbook = () => {
         </div>
       </section>
 
-      {/* Book Details Section */}
       <section className="bg-white p-4 mt-8">
         <div className="container mx-auto">
           {loading ? (
@@ -131,7 +129,7 @@ const Viewbook = () => {
 
                   <Link
                     to={`/one-book/${book._id}`}
-                    className="bg-blue-500 text-white p-2 rounded-md mt-4 inline-block hover:bg-blue-600 focus:outline-none"
+                    className="bg-gray-500 text-white p-2 w-full text-center rounded-md mt-4 inline-block hover:bg-gray-600 focus:outline-none"
                   >
                     View
                   </Link>

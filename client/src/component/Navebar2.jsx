@@ -31,8 +31,8 @@ const Navebar2 = () => {
         </div>
         <ul className='flex ml-96 gap-6 mt-4 '>
           <li  className='hover:text-purple-400'><a href='#home'>Home</a></li>
-          <li className='hover:text-purple-400'><a href='#about'>About Us</a></li>
-          <li className='hover:text-purple-400'><a href='#contact'>Contact Us</a></li>
+          <li className='hover:text-purple-400'><a href='#about'>About</a></li>
+          <li className='hover:text-purple-400'><a href='#contact'>Contact</a></li>
           <li className='hover:text-purple-400'><Link to={'/signup'}>Sign Up</Link></li>
           <li className='hover:text-purple-400'><Link to={'/login'}>Login</Link></li>
         </ul>

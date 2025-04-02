@@ -1,5 +1,4 @@
 import { Router } from "express";
-import mongoose from "mongoose";
 import dotenv from "dotenv";
 import multer from "multer";
 import path from "path";
@@ -8,6 +7,7 @@ import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { verifyToken } from "../Middle-Ware/Auth.js";
+import { Books, Review, User } from "../models/db.js";
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -30,43 +30,7 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage }); //multer middleware
-
-const userSchema = new mongoose.Schema({
-  fullName: String,
-  emailAddress: { type: String, unique: true },
-  password: String,
-  mobile_no: Number,
-  role: { type: String, enum: ["ADMIN", "USER"], default: "USER" },
-});
-
-const reviewSchema= new mongoose.Schema({
-
-  bookName:{type:String, required:true},
-  rating: { type: Number, required: true, min: 1, max: 5 },
-  review: { type: String, required: true },
-  user: { type: mongoose.Schema.Types.ObjectId,required: true,ref: 'User'}
-})
-
-const bookSchema = new mongoose.Schema({
-
-  bookName: { type: String, required: true, unique: true },
-  author: { type: String, required: true },
-  genre: { type: String, required: true },
-  description: { type: String, required: true },
-  publishedDate: { type: String, required: true },
-  imageUrl: { type: String, required: true },
-  reviews: [reviewSchema],
-  rating: {type: Number, required: true,default: 0},
-  numReviews: {type: Number,required: true, default: 0}
- 
-});
-
-
-
-const User = mongoose.model("User_Profiles", userSchema);
-const Books = mongoose.model("Book_Details", bookSchema);
-const Review=mongoose.model("Reviews",reviewSchema);
+const upload = multer({ storage });
 
 
 adminRouter.get("/", (req, res) => {
@@ -76,15 +40,14 @@ adminRouter.get("/", (req, res) => {
 adminRouter.post("/signup", async (req, res) => {
   try {
     const { Fullname, Emailaddress, Password, Mobilenumber } = req.body;
-    // console.log(Fullname, Emailaddress, Password, Mobilenumber);
 
-    // if (!Fullname || !Emailaddress || !Password || !Mobilenumber) {
-    //     return res.status(400).json({
-    //         message: "Provide the required details",
-    //         error: true,
-    //         success: false,
-    //     });
-    // }
+    if (!Fullname || !Emailaddress || !Password || !Mobilenumber) {
+      return res.status(400).json({
+        message: "Provide the required details",
+        error: true,
+        success: false,
+      });
+    }
 
     const user = await User.findOne({ emailAddress: Emailaddress });
 
@@ -96,7 +59,7 @@ adminRouter.post("/signup", async (req, res) => {
       });
     }
     console.log(user);
-    
+
 
     const hashedPassword = await bcrypt.hash(Password, 10);
 
@@ -145,7 +108,7 @@ adminRouter.post("/login", async (req, res) => {
       });
     }
 
-    const checkPassword = await bcrypt.compare(Password, user.password);
+    const checkPassword = bcrypt.compare(Password, user.password);
 
     if (!checkPassword) {
       return res.status(400).json({
@@ -156,7 +119,7 @@ adminRouter.post("/login", async (req, res) => {
     }
 
     const token = jwt.sign(
-      { userId: user._id, userType: user.role },process.env.SECRET_KEY,
+      { userId: user._id, userType: user.role }, process.env.SECRET_KEY,
       {
         expiresIn: "1h",
       }
@@ -178,45 +141,42 @@ adminRouter.post("/login", async (req, res) => {
   }
 });
 
-//upload single file
 adminRouter.post(
   "/addbook",
   upload.single("file"),
-  verifyToken,
   async (req, res) => {
     try {
 
-      if(req.userType='ADMIN'){
+      // if (req.userType = 'ADMIN') {
 
-      const { title, author, genre, description, pubdate } = req.body;
+        const { title, author, genre, description, pubdate } = req.body;
 
-      // Check if the book already exists
+        const existingBook = await Books.findOne({
+          bookName: title,
+          author: author,
+        });
+        if (existingBook) {
+          return res.status(400).json({ message: "Book already exists" });
+        }
 
-      const existingBook = await Books.findOne({
-        bookName: title,
-        author: author,
-      });
-      if (existingBook) {
-        return res.status(400).json({ message: "Book already exists" });
-      }
+        // Save new book to database
+        const newBook = new Books({
+          bookName: title,
+          author: author,
+          genre: genre,
+          description: description,
+          publishedDate: pubdate,
+          imageUrl: `/Images/${req.file.filename}`,
+        });
 
-      // Save new book to database
-      const newBook = new Books({
-        bookName: title,
-        author: author,
-        genre: genre,
-        description: description,
-        publishedDate: pubdate,
-        imageUrl: `/Images/${req.file.filename}`,
-      });
+        await newBook.save();
 
-      await newBook.save();
+        res
+          .status(201)
+          .json({ message: "Book added successfully", book: newBook });
+      
+    }
 
-      res
-        .status(201)
-        .json({ message: "Book added successfully", book: newBook });
-    }}
-    
     catch (error) {
       console.error("Error:", error);
       res.status(500).json({ message: "Server Error", error });
@@ -228,10 +188,10 @@ adminRouter.post(
 // Fetch all books
 adminRouter.get("/viewbooks", async (req, res) => {
   try {
-    const books = await Books.find(); // Find all books in the database
-    res.status(200).json(books); // Return books as JSON
+    const books = await Books.find();
+    res.status(200).json(books);
     console.log(books);
-    
+
   } catch (error) {
     console.error("Error fetching books:", error);
     res.status(500).json({ message: "Server Error", error });
@@ -260,7 +220,7 @@ adminRouter.post("/books/search", async (req, res) => {
   try {
     const query = {};
 
-    if (bookTitle) query.bookName = { $regex: bookTitle, $options: "i" }; // Case-insensitive search
+    if (bookTitle) query.bookName = { $regex: bookTitle, $options: "i" };
     if (author) query.author = { $regex: author, $options: "i" };
     if (genre && genre !== "All Genres") query.genre = genre;
     if (publicationYear) query.publishedDate = publicationYear;
@@ -274,64 +234,65 @@ adminRouter.post("/books/search", async (req, res) => {
 });
 
 
-adminRouter.get('/searchbook/:genre', async (req,res)=>{
+adminRouter.get('/searchbook/:genre', async (req, res) => {
 
   try {
 
-  const genre= req.params.genre;
-  
+    const genre = req.params.genre;
 
-  if(genre){
 
-    const result= await Books.find({genre})
+    if (genre) {
 
-    if (result.length === 0) {
-      return res.status(404).json({ message: "No books found for this genre" });
+      const result = await Books.find({ genre })
+
+      if (result.length === 0) {
+        return res.status(404).json({ message: "No books found for this genre" });
+      }
+
+      res.status(200).json(result);
+      console.log(result);
+
     }
-
-    res.status(200).json(result);
-    console.log(result);
-
+  } catch (error) {
+    console.error("Error fetching books by genre:", error);
+    res.status(500).json({ error: "An error occurred while fetching books" });
   }
-} catch (error) {
-  console.error("Error fetching books by genre:", error);
-  res.status(500).json({ error: "An error occurred while fetching books" });
-}
 })
 
 
 
-adminRouter.put("/updatebook/:id", verifyToken, async (req, res) => {
+adminRouter.put("/updatebook/:id", async (req, res) => {
   try {
     const ID = req.params.id;
 
-    if(req.userType='ADMIN'){
+    if (req.userType = 'ADMIN') {
 
-   
-    const { title, author, genre, description, pubdate } = req.body;
 
-    const existingBook = await Books.findById({ _id: ID });
+      const { title, author, genre, description, pubdate } = req.body;
 
-    if (existingBook) {
-      const body = await Books.updateOne(
-        { _id: ID },
-        {
-          $set: {
-            bookName: title,
-            author: author,
-            genre: genre,
-            publishedDate: pubdate,
-            description: description,
-          },
+      const existingBook = await Books.findById({ _id: ID });
+
+      if (existingBook) {
+        const body = await Books.updateOne(
+          { _id: ID },
+          {
+            $set: {
+              bookName: title,
+              author: author,
+              genre: genre,
+              publishedDate: pubdate,
+              description: description,
+            },
+          }
+        );
+        if (body.matchedCount === 0) {
+          return res.status(400).json({ message: "No book found" });
+        } else {
+          res.status(200).json({ message: "successfully Updated" });
         }
-      );
-      if (body.matchedCount === 0) {
-        return res.status(400).json({ message: "No book found" });
-      } else {
-        res.status(200).json({ message: "successfully Updated" });
       }
     }
-  }  }
+  }
   catch (error) {
     console.error(error);
     return res.status(500).json({ message: "Internal Server Error" });
@@ -339,21 +300,21 @@ adminRouter.put("/updatebook/:id", verifyToken, async (req, res) => {
 });
 
 
-adminRouter.delete("/deletebook/:id", verifyToken, async (req, res) => {
+adminRouter.delete("/deletebook/:id", async (req, res) => {
   const ID = req.params.id;
 
   try {
-    if(req.userType==='ADMIN'){
+    if (req.userType === 'ADMIN') {
 
-   
-    const result = await Books.deleteOne({ _id: ID });
 
-    if (result.deletedCount === 0) {
-      return res.status(404).json({ message: "Book not found" });
+      const result = await Books.deleteOne({ _id: ID });
+
+      if (result.deletedCount === 0) {
+        return res.status(404).json({ message: "Book not found" });
+      }
+
+      res.status(200).json({ message: "Book deleted" });
     }
-
-    res.status(200).json({ message: "Book deleted" });
-  }
   } catch (error) {
     console.error("Error deleting book:", error);
     res.status(500).json({ message: "Server error while deleting book" });
@@ -361,17 +322,15 @@ adminRouter.delete("/deletebook/:id", verifyToken, async (req, res) => {
 });
 
 
-adminRouter.post("/reviews/:bookId", verifyToken, async (req, res) => {
+adminRouter.post("/reviews/:bookId", async (req, res) => {
   const { rating, review } = req.body;
   const bookId = req.params.bookId;
-  const userId = req.userId; 
+  const userId = req.userId;
 
-  // console.log(bookId, rating, review, userId);
 
   try {
 
     const book = await Books.findById(bookId);
-    // console.log(book);
 
     if (!book) {
       return res.status(404).json({ message: "Book not found" });
@@ -379,7 +338,7 @@ adminRouter.post("/reviews/:bookId", verifyToken, async (req, res) => {
 
     const existingReview = await Review.findOne({ bookName: book.bookName, user: userId });
     console.log(existingReview);
-    
+
     if (existingReview) {
       return res.status(400).json({ message: "You have already reviewed this book." });
     }
@@ -410,7 +369,7 @@ adminRouter.post("/reviews/:bookId", verifyToken, async (req, res) => {
 
 
 
-adminRouter.put("/updatereview/:bookId", verifyToken, async (req, res) => {
+adminRouter.put("/updatereview/:bookId", async (req, res) => {
   const { rating, review } = req.body;
   const bookId = req.params.bookId;
   const userId = req.userId;
@@ -421,7 +380,6 @@ adminRouter.put("/updatereview/:bookId", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "Book not found" });
     }
 
-    // Find review by user for the specific book
     const existingReview = book.reviews.find(
       (r) => r.user.toString() === userId.toString()
     );
@@ -430,11 +388,9 @@ adminRouter.put("/updatereview/:bookId", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "Review not found" });
     }
 
-    // Update the review
     existingReview.rating = rating;
     existingReview.review = review;
 
-    // Update overall book rating
     book.rating =
       book.reviews.reduce((sum, r) => sum + r.rating, 0) / book.reviews.length;
 
@@ -451,13 +407,13 @@ adminRouter.put("/updatereview/:bookId", verifyToken, async (req, res) => {
 });
 
 
-adminRouter.get("/userreviews", verifyToken, async (req, res) => {
+adminRouter.get("/userreviews", async (req, res) => {
   const userId = req.userId;
 
   try {
     const reviews = await Review.find({ user: userId }).populate({
       path: "user",
-      select: "fullName emailAddress", // Include relevant user details
+      select: "fullName emailAddress",
     });
 
     if (reviews.length === 0) {
@@ -473,53 +429,50 @@ adminRouter.get("/userreviews", verifyToken, async (req, res) => {
 
 
 
-adminRouter.delete("/deletereview/:bookId/:reviewId",verifyToken,async (req, res) => {
-  
-    const { bookId, reviewId } = req.params;
-    const userId = req.userId;
+adminRouter.delete("/deletereview/:bookId/:reviewId", async (req, res) => {
 
-    try {
-      const book = await Books.findById(bookId);
-      if (!book) {
-        return res.status(404).json({ message: "Book not found" });
-      }
+  const { bookId, reviewId } = req.params;
+  const userId = req.userId;
 
-      const review = book.reviews.find((r) => r._id.toString() === reviewId);
-      if (!review) {
-        return res.status(404).json({ message: "Review not found" });
-      }
-
-      if (
-        review.user.toString() !== userId.toString() &&
-        req.userType !== "ADMIN"
-      ) {
-        return res
-          .status(403)
-          .json({ message: "Unauthorized to delete this review" });
-      }
-
-      // Remove review from book
-      book.reviews = book.reviews.filter((r) => r._id.toString() !== reviewId);
-
-      // Update book rating
-      book.numReviews = book.reviews.length;
-      book.rating =
-        book.reviews.length > 0
-          ? book.reviews.reduce((sum, r) => sum + r.rating, 0) /
-            book.reviews.length
-          : 0;
-
-      await book.save();
-
-      // Delete review from Review collection
-      await Review.findByIdAndDelete(reviewId);
-
-      res.status(200).json({ message: "Review deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting review:", error);
-      res.status(500).json({ message: "Server Error", error: error.message });
+  try {
+    const book = await Books.findById(bookId);
+    if (!book) {
+      return res.status(404).json({ message: "Book not found" });
     }
+
+    const review = book.reviews.find((r) => r._id.toString() === reviewId);
+    if (!review) {
+      return res.status(404).json({ message: "Review not found" });
+    }
+
+    if (
+      review.user.toString() !== userId.toString() &&
+      req.userType !== "ADMIN"
+    ) {
+      return res
+        .status(403)
+        .json({ message: "Unauthorized to delete this review" });
+    }
+
+    book.reviews = book.reviews.filter((r) => r._id.toString() !== reviewId);
+
+    book.numReviews = book.reviews.length;
+    book.rating =
+      book.reviews.length > 0
+        ? book.reviews.reduce((sum, r) => sum + r.rating, 0) /
+        book.reviews.length
+        : 0;
+
+    await book.save();
+
+    await Review.findByIdAndDelete(reviewId);
+
+    res.status(200).json({ message: "Review deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting review:", error);
+    res.status(500).json({ message: "Server Error", error: error.message });
   }
+}
 );
 
 
@@ -531,4 +484,4 @@ adminRouter.get("/logout", (req, res) => {
   res.status(200).json({ message: "Logout successful" });
 });
 
-export { adminRouter, User }; // Export the router
+export { adminRouter }; 

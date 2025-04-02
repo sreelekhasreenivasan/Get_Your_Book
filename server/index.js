@@ -25,12 +25,11 @@ const port = process.env.port;
 
 mongoose.connect('mongodb://localhost:27017/Get_Your_Book');
 
-// app.use('/',userRouter);
 app.use('/',adminRouter);
 
 
 
 app.listen(port, ()=>{
-    console.log('Server listening  to port');
+    console.log(`Server listening to ${port}`);
     
 })
